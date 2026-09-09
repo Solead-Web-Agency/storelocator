@@ -1,0 +1,5 @@
+PCS_liste store_*.csv
+scripts/
+README.md
+.gitattributes
+.gitignore

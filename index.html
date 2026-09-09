@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Trouver une boutique PCS</title>
+  <!-- La page est destinée à être intégrée en iframe : on évite qu'elle soit indexée seule. -->
+  <meta name="robots" content="noindex">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet">
+  <link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-pin" viewBox="0 0 28 36">
+    <path d="M14 1C6.8 1 1 6.7 1 13.8 1 23.5 14 35 14 35s13-11.5 13-21.2C27 6.7 21.2 1 14 1z" fill="currentColor" stroke="#fff" stroke-width="1.5"/>
+    <circle cx="14" cy="14" r="5" fill="#fff"/>
+  </symbol>
+  <symbol id="i-target" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2"/>
+    <circle cx="12" cy="12" r="2.5" fill="currentColor"/>
+    <path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  </symbol>
+</svg>
+
+<div class="sl" id="app" data-view="list">
+
+  <header class="sl-head">
+    <h1 class="sl-title">Trouver une boutique</h1>
+
+    <form class="sl-search" id="search-form" role="search" autocomplete="off">
+      <div class="sl-field">
+        <input id="search-input" class="sl-input" type="search" name="q"
+               placeholder="Ville, code postal ou adresse"
+               aria-label="Rechercher une ville, un code postal ou une adresse"
+               aria-autocomplete="list" aria-controls="suggestions" aria-expanded="false">
+        <button type="button" id="geoloc-btn" class="sl-geoloc" title="Autour de moi" aria-label="Me géolocaliser">
+          <svg width="20" height="20"><use href="#i-target"/></svg>
+        </button>
+        <ul id="suggestions" class="sl-suggest" role="listbox" hidden></ul>
+      </div>
+      <a class="sl-btn sl-btn--primary" id="open-account" href="#" target="_top">Ouvrir un compte</a>
+    </form>
+
+    <div class="sl-tabs" role="tablist" aria-label="Affichage">
+      <button type="button" role="tab" data-view="list" aria-selected="true">Liste</button>
+      <button type="button" role="tab" data-view="map" aria-selected="false">Carte</button>
+    </div>
+  </header>
+
+  <aside class="sl-panel" id="panel">
+    <p class="sl-status" id="status" aria-live="polite">Chargement des points de vente…</p>
+    <ol class="sl-list" id="list"></ol>
+    <button type="button" class="sl-btn sl-more" id="more" hidden>Afficher plus</button>
+  </aside>
+
+  <section class="sl-map-wrap">
+    <div id="map" class="sl-map" aria-label="Carte des points de vente"></div>
+
+    <div class="sl-legend" id="legend">
+      <p class="sl-legend__title">Services disponibles</p>
+      <button type="button" class="sl-legend__item" data-type="1" aria-pressed="true">
+        <svg class="sl-pin sl-pin--1" width="14" height="18"><use href="#i-pin"/></svg>
+        <span>Recharge</span>
+      </button>
+      <button type="button" class="sl-legend__item" data-type="2" aria-pressed="true">
+        <svg class="sl-pin sl-pin--2" width="14" height="18"><use href="#i-pin"/></svg>
+        <span>Recharge, Vente de carte</span>
+      </button>
+    </div>
+  </section>
+
+</div>
+
+<template id="tpl-card">
+  <li class="sl-card">
+    <article>
+      <div class="sl-card__head">
+        <svg class="sl-pin" width="16" height="20" aria-hidden="true"><use href="#i-pin"/></svg>
+        <h2 class="sl-card__title"></h2>
+      </div>
+      <div class="sl-card__body">
+        <address class="sl-card__addr"></address>
+        <div class="sl-card__aside">
+          <p class="sl-card__services"></p>
+          <p class="sl-card__dist"></p>
+        </div>
+      </div>
+      <div class="sl-card__actions">
+        <button type="button" class="sl-btn" data-action="show">Voir sur la carte</button>
+        <a class="sl-btn" data-action="route" target="_blank" rel="noopener">Itinéraire</a>
+      </div>
+    </article>
+  </li>
+</template>
+
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5/dist/maplibre-gl.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,215 @@
+/* ==========================================================================
+   Store locator PCS — styles
+   Variables en tête : couleurs, polices et rayons à ajuster à la charte.
+   ========================================================================== */
+:root {
+  --sl-red: #e3262b;
+  --sl-red-dark: #c41d22;
+  --sl-ink: #111111;
+  --sl-muted: #5c5c5c;
+  --sl-grey-pin: #7a7a7a;
+  --sl-beige: #f2eae6;
+  --sl-border: #d9d9d9;
+  --sl-bg: #ffffff;
+  --sl-radius: 12px;
+  --sl-font: "Archivo", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --sl-font-title: "Archivo Black", "Archivo", system-ui, sans-serif;
+  --sl-gap: 16px;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  background: var(--sl-bg);
+  color: var(--sl-ink);
+  font-family: var(--sl-font);
+  font-size: 14px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}
+
+button, input, a { font: inherit; color: inherit; }
+button { cursor: pointer; }
+
+/* ---------- Layout -------------------------------------------------------- */
+.sl {
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(320px, 420px) 1fr;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0 var(--sl-gap);
+  padding: var(--sl-gap);
+}
+.sl-head    { grid-area: 1 / 1; }
+.sl-panel   { grid-area: 2 / 1; min-height: 0; overflow-y: auto; padding-top: 4px; scrollbar-width: thin; }
+.sl-map-wrap{ grid-area: 1 / 2 / 3 / 3; position: relative; min-height: 0; }
+
+/* ---------- Header : titre + recherche ------------------------------------ */
+.sl-title {
+  margin: 4px 0 18px;
+  font-family: var(--sl-font-title);
+  font-size: clamp(26px, 3.2vw, 36px);
+  line-height: 0.95;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+}
+
+.sl-search { display: flex; gap: 10px; align-items: stretch; margin-bottom: 14px; }
+.sl-field  { position: relative; flex: 1; min-width: 0; }
+
+.sl-input {
+  width: 100%;
+  height: 40px;
+  padding: 0 40px 0 12px;
+  border: 1px solid var(--sl-border);
+  border-radius: 6px;
+  background: #fff;
+  outline: none;
+}
+.sl-input:focus { border-color: var(--sl-ink); }
+.sl-input::-webkit-search-cancel-button { -webkit-appearance: none; }
+
+.sl-geoloc {
+  position: absolute; top: 0; right: 0;
+  width: 40px; height: 40px;
+  display: grid; place-items: center;
+  border: 0; background: transparent; color: var(--sl-muted);
+  border-radius: 6px;
+}
+.sl-geoloc:hover { color: var(--sl-red); }
+.sl-geoloc.is-busy { animation: sl-pulse 0.9s ease-in-out infinite; }
+@keyframes sl-pulse { 50% { opacity: 0.3; } }
+
+.sl-suggest {
+  position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 4px);
+  margin: 0; padding: 6px 0; list-style: none;
+  background: #fff; border: 1px solid var(--sl-border); border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  max-height: 260px; overflow-y: auto;
+}
+.sl-suggest li { padding: 8px 12px; cursor: pointer; }
+.sl-suggest li small { display: block; color: var(--sl-muted); font-size: 12px; }
+.sl-suggest li:hover, .sl-suggest li[aria-selected="true"] { background: var(--sl-beige); }
+
+/* ---------- Boutons ------------------------------------------------------- */
+.sl-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 36px; padding: 0 14px;
+  border: 1px solid var(--sl-border); border-radius: 6px;
+  background: #fff; color: var(--sl-ink);
+  font-size: 13px; font-weight: 500; text-decoration: none; white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+}
+.sl-btn:hover { border-color: var(--sl-ink); }
+.sl-btn--primary {
+  height: 40px; padding: 0 16px;
+  background: var(--sl-red); border-color: var(--sl-red); color: #fff; font-weight: 600;
+}
+.sl-btn--primary:hover { background: var(--sl-red-dark); border-color: var(--sl-red-dark); }
+
+/* ---------- Onglets mobile (Liste / Carte) -------------------------------- */
+.sl-tabs { display: none; gap: 6px; padding: 4px; border-radius: 8px; background: #f0f0f0; margin-bottom: 10px; }
+.sl-tabs button {
+  flex: 1; height: 34px; border: 0; border-radius: 6px; background: transparent; font-weight: 600; color: var(--sl-muted);
+}
+.sl-tabs button[aria-selected="true"] { background: #fff; color: var(--sl-ink); box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+
+/* ---------- Liste --------------------------------------------------------- */
+.sl-status { margin: 0 0 10px; color: var(--sl-muted); font-size: 13px; }
+.sl-status.is-error { color: var(--sl-red); }
+
+.sl-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+
+.sl-card {
+  background: var(--sl-beige);
+  border-radius: var(--sl-radius);
+  padding: 16px 18px;
+  border: 2px solid transparent;
+  transition: border-color 0.15s;
+}
+.sl-card.is-selected { border-color: var(--sl-red); }
+
+.sl-card__head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.sl-card__title {
+  margin: 0; font-size: 15px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.01em; line-height: 1.2;
+}
+.sl-card__body { display: flex; justify-content: space-between; gap: 12px; padding-left: 24px; }
+.sl-card__addr { font-style: normal; font-size: 12.5px; line-height: 1.45; }
+.sl-card__aside { text-align: right; font-size: 12.5px; flex-shrink: 0; }
+.sl-card__services { margin: 0; line-height: 1.45; }
+.sl-card__dist { margin: 4px 0 0; color: var(--sl-muted); font-size: 12px; }
+.sl-card__actions { display: flex; gap: 8px; margin-top: 12px; padding-left: 24px; }
+
+.sl-more { width: 100%; margin: 14px 0 4px; }
+
+/* Pins (SVG inline : cartes, légende, popup) */
+.sl-pin { color: var(--sl-grey-pin); flex-shrink: 0; }
+.sl-pin--2, .sl-card[data-type="2"] .sl-pin { color: var(--sl-red); }
+
+/* ---------- Carte --------------------------------------------------------- */
+.sl-map {
+  position: absolute; inset: 0;
+  border-radius: 16px;
+  border: 1px solid #e8e8e8;
+  overflow: hidden;
+  background: #f4f4f2;
+}
+.sl-map canvas:focus { outline: none; }
+
+.sl-legend {
+  position: absolute; left: 16px; bottom: 16px; z-index: 5;
+  background: #fff; border-radius: 10px; padding: 12px 14px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px;
+  font-size: 12.5px;
+}
+.sl-legend__title { width: 100%; margin: 0 0 2px; font-weight: 700; font-size: 13px; }
+.sl-legend__item {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 0; background: transparent; padding: 2px 0; opacity: 1; transition: opacity 0.15s;
+}
+.sl-legend__item[aria-pressed="false"] { opacity: 0.35; text-decoration: line-through; }
+.sl-legend__item:hover { opacity: 0.8; }
+
+/* Popup MapLibre */
+.maplibregl-popup { max-width: 280px !important; z-index: 6; }
+.maplibregl-popup-content {
+  padding: 16px 18px 14px; border-radius: 12px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.16);
+  font-family: var(--sl-font);
+}
+.maplibregl-popup-close-button {
+  top: 8px; right: 10px; font-size: 20px; line-height: 1; color: var(--sl-muted); padding: 0 4px; border-radius: 4px;
+}
+.maplibregl-popup-close-button:hover { background: #f2f2f2; }
+.sl-pop h3 { margin: 0 20px 6px 0; font-size: 14px; font-weight: 700; text-transform: uppercase; }
+.sl-pop p  { margin: 0; font-size: 12px; line-height: 1.45; }
+.sl-pop__services { color: var(--sl-muted); margin-top: 4px !important; }
+.sl-pop__actions { display: flex; gap: 8px; margin-top: 12px; }
+.sl-pop__actions .sl-btn { height: 32px; padding: 0 12px; font-size: 12.5px; }
+
+.maplibregl-ctrl-group { border-radius: 8px !important; box-shadow: 0 2px 8px rgba(0,0,0,0.12) !important; }
+.maplibregl-ctrl-attrib { font-size: 10px; }
+
+/* ---------- Mobile -------------------------------------------------------- */
+@media (max-width: 800px) {
+  :root { --sl-gap: 12px; }
+  .sl { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); gap: 0; }
+  .sl-head     { grid-area: 1 / 1; }
+  .sl-panel    { grid-area: 2 / 1; }
+  .sl-map-wrap { grid-area: 2 / 1; }
+  .sl-title { font-size: 26px; margin-bottom: 12px; }
+  .sl-tabs { display: flex; }
+  /* La carte reste dimensionnée (pas de display:none) pour que MapLibre garde ses dimensions. */
+  .sl[data-view="list"] .sl-map-wrap { opacity: 0; visibility: hidden; pointer-events: none; z-index: -1; }
+  .sl[data-view="map"]  .sl-panel    { display: none; }
+  .sl-map { border-radius: 12px; }
+  .sl-legend { left: 10px; bottom: 10px; right: 10px; padding: 10px 12px; }
+}
+@media (max-width: 420px) {
+  .sl-search { flex-wrap: wrap; }
+  .sl-btn--primary { width: 100%; }
+}
