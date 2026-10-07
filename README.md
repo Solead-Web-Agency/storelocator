@@ -4,6 +4,9 @@ Carte des points de vente PCS (recharges et cartes), en site statique, prévue p
 en iframe dans Webflow.
 
 - Aucun build : `index.html` + `assets/app.css` + `assets/app.js` + `data/stores.json`.
+- Deux langues : `/` en français, `/en/` en anglais. Les deux pages partagent le même script et le même CSS ;
+  la langue est lue sur la balise `<script data-lang="en" data-base="../">`. Les textes JS sont dans la table
+  `I18N` de `assets/app.js`, les textes HTML dans chaque `index.html` (à garder synchronisés).
 - Carte : [MapLibre GL](https://maplibre.org/) avec le fond clair « positron » d'[OpenFreeMap](https://openfreemap.org/) (gratuit, sans clé).
 - Recherche : géocodeur adresses de l'État (Géoplateforme IGN, repli sur l'API Adresse BAN), gratuit et sans clé.
 - Regroupement automatique des 28 000 points en clusters, liste des boutiques triée par distance.
@@ -50,6 +53,7 @@ Ajouter un élément **Embed** (code HTML) dans la page Webflow :
 
 - La hauteur de l'iframe fixe la hauteur de l'application : la liste défile à l'intérieur.
 - `allow="geolocation"` est nécessaire pour le bouton « Autour de moi ».
+- Version anglaise : même iframe avec `src="https://VOTRE-DOMAINE/storelocator/en/"`.
 - On peut pré-remplir une recherche : `.../storelocator/?q=Lyon`.
 - Le bouton « Ouvrir un compte » s'ouvre dans la page parente (`target="_top"`).
 - La molette seule fait défiler la page Webflow ; Ctrl/⌘ + molette zoome la carte (deux doigts sur mobile).
@@ -58,6 +62,6 @@ Ajouter un élément **Embed** (code HTML) dans la page Webflow :
 
 ## Personnaliser
 
-- Textes, URL « Ouvrir un compte », zooms, couleurs des pins : objet `CONFIG` en tête de `assets/app.js`.
+- Textes et URL « Ouvrir un compte » par langue : table `I18N` ; zooms, couleurs des pins : objet `CONFIG`, en tête de `assets/app.js`.
 - Couleurs, polices, rayons : variables `:root` en tête de `assets/app.css`.
-- Libellés des boutons des cartes : dans le `<template id="tpl-card">` de `index.html`.
+- Libellés des boutons des cartes : dans le `<template id="tpl-card">` de `index.html` et `en/index.html`.

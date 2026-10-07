@@ -1,12 +1,78 @@
 /* ==========================================================================
    Store locator PCS — application
-   Tout ce qui est susceptible de changer (URLs, textes, zooms) est dans CONFIG.
+   - Langue : lue sur la balise <script data-lang="fr|en" data-base="../">
+   - Tout ce qui est susceptible de changer (URLs, textes, zooms) est dans I18N / CONFIG.
    ========================================================================== */
 (() => {
   "use strict";
 
+  // ---------- Langue ---------------------------------------------------------
+  const SCRIPT = document.currentScript;
+  const LANG = (SCRIPT && SCRIPT.dataset.lang) || document.documentElement.lang || "fr";
+  const BASE = (SCRIPT && SCRIPT.dataset.base) || "";   // "../" pour /en/
+
+  const I18N = {
+    fr: {
+      numberLocale: "fr-FR",
+      decimal: ",",
+      types: { 1: "Recharge", 2: "Recharge, Vente de carte" },
+      openAccountUrl: "https://www.mypcs.com/",
+      mapLocale: {
+        "NavigationControl.ZoomIn": "Zoom avant",
+        "NavigationControl.ZoomOut": "Zoom arrière",
+        "AttributionControl.ToggleAttribution": "Afficher les sources",
+        "Popup.Close": "Fermer",
+        "CooperativeGesturesHandler.WindowsHelpText": "Utilisez Ctrl + molette pour zoomer la carte",
+        "CooperativeGesturesHandler.MacHelpText": "Utilisez ⌘ + molette pour zoomer la carte",
+        "CooperativeGesturesHandler.MobileHelpText": "Utilisez deux doigts pour déplacer la carte",
+      },
+      labels: {
+        loading: "Chargement des points de vente…",
+        loadError: "Impossible de charger les points de vente. Réessayez plus tard.",
+        searching: "Recherche…",
+        hint: (total) => `${total} points de vente en France. Recherchez une ville ou zoomez sur la carte.`,
+        inView: (n, f) => n === 0 ? "Aucun point de vente dans cette zone." : `${f} point${n > 1 ? "s" : ""} de vente dans cette zone.`,
+        nearOrigin: (n, f) => n === 0 ? "Aucun point de vente autour de votre recherche." : `${f} point${n > 1 ? "s" : ""} de vente autour de votre recherche.`,
+        noFilter: "Sélectionnez un service dans la légende.",
+        notFound: "Adresse introuvable. Essayez une ville ou un code postal.",
+        geocodeError: "Le service de recherche est indisponible. Réessayez.",
+        geolocDenied: "Géolocalisation refusée. Saisissez une ville ou une adresse.",
+        geolocError: "Position indisponible. Saisissez une ville ou une adresse.",
+        distance: (d) => `à ${d}`,
+        copied: "Adresse copiée",
+        copy: "Copier l'adresse",
+        route: "Itinéraire",
+      },
+    },
+    en: {
+      numberLocale: "en-GB",
+      decimal: ".",
+      types: { 1: "Top-up", 2: "Top-up, Card sales" },
+      openAccountUrl: "https://www.mypcs.com/en/",
+      mapLocale: undefined, // textes MapLibre par défaut (anglais)
+      labels: {
+        loading: "Loading stores…",
+        loadError: "Unable to load the stores. Please try again later.",
+        searching: "Searching…",
+        hint: (total) => `${total} stores in France. Search for a city or zoom in on the map.`,
+        inView: (n, f) => n === 0 ? "No stores in this area." : `${f} store${n > 1 ? "s" : ""} in this area.`,
+        nearOrigin: (n, f) => n === 0 ? "No stores near your search." : `${f} store${n > 1 ? "s" : ""} near your search.`,
+        noFilter: "Select a service in the legend.",
+        notFound: "Address not found. Try a city or a postcode.",
+        geocodeError: "The search service is unavailable. Please try again.",
+        geolocDenied: "Location access denied. Enter a city or an address.",
+        geolocError: "Location unavailable. Enter a city or an address.",
+        distance: (d) => `${d} away`,
+        copied: "Address copied",
+        copy: "Copy address",
+        route: "Directions",
+      },
+    },
+  };
+  const T = I18N[LANG] || I18N.fr;
+
   const CONFIG = {
-    dataUrl: "data/stores.json",
+    dataUrl: BASE + "data/stores.json",
     // Fond de carte clair, gratuit et sans clé (OpenFreeMap, style "positron").
     mapStyle: "https://tiles.openfreemap.org/styles/positron",
     // Géocodeur adresses France (Géoplateforme IGN) + repli sur l'ancienne API BAN.
@@ -14,7 +80,7 @@
       "https://data.geopf.fr/geocodage/search",
       "https://api-adresse.data.gouv.fr/search/",
     ],
-    openAccountUrl: "https://www.mypcs.com/",
+    openAccountUrl: T.openAccountUrl,
     // true : molette = défilement de la page, Ctrl/⌘ + molette = zoom ; deux doigts sur mobile.
     // Recommandé en iframe pour ne pas bloquer le défilement de la page Webflow.
     cooperativeGestures: true,
@@ -27,21 +93,7 @@
     geolocZoom: 13,
     pins: { 1: "#7a7a7a", 2: "#e3262b" },
     clusterColor: "#2b2b2b",
-    labels: {
-      loading: "Chargement des points de vente…",
-      loadError: "Impossible de charger les points de vente. Réessayez plus tard.",
-      hint: (total) => `${total} points de vente en France. Recherchez une ville ou zoomez sur la carte.`,
-      inView: (n) => n === 0 ? "Aucun point de vente dans cette zone." : `${n} point${n > 1 ? "s" : ""} de vente dans cette zone.`,
-      nearOrigin: (n) => `${n} point${n > 1 ? "s" : ""} de vente autour de votre recherche.`,
-      noFilter: "Sélectionnez un service dans la légende.",
-      notFound: "Adresse introuvable. Essayez une ville ou un code postal.",
-      geocodeError: "Le service de recherche est indisponible. Réessayez.",
-      geolocDenied: "Géolocalisation refusée. Saisissez une ville ou une adresse.",
-      geolocError: "Position indisponible. Saisissez une ville ou une adresse.",
-      copied: "Adresse copiée",
-      copy: "Copier l'adresse",
-      route: "Itinéraire",
-    },
+    labels: T.labels,
   };
 
   // ---------- DOM ------------------------------------------------------------
@@ -57,7 +109,7 @@
   const state = {
     stores: [],            // {id, type, address, cp, city, lng, lat}
     byId: new Map(),
-    types: {},             // {1: "Recharge", 2: "..."}
+    types: {},             // libellés du JSON (repli si la langue n'en définit pas)
     filter: { 1: true, 2: true },
     origin: null,          // [lng, lat] de la recherche / géoloc
     selectedId: null,
@@ -68,7 +120,7 @@
 
   let map, popup, originMarker;
 
-  const nf = new Intl.NumberFormat("fr-FR");
+  const nf = new Intl.NumberFormat(T.numberLocale);
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const setStatus = (msg, isError = false) => { el.status.textContent = msg; el.status.classList.toggle("is-error", isError); };
 
@@ -77,7 +129,7 @@
     const res = await fetch(CONFIG.dataUrl);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
-    state.types = json.types || { 1: "Recharge", 2: "Recharge, Vente de carte" };
+    state.types = json.types || {};
     state.stores = json.stores.map(([id, type, address, cp, city, lng, lat]) => ({ id, type, address, cp, city, lng, lat }));
     state.byId = new Map(state.stores.map((s) => [s.id, s]));
   }
@@ -95,7 +147,7 @@
   }
 
   const filteredStores = () => state.stores.filter((s) => state.filter[s.type]);
-  const servicesOf = (s) => state.types[s.type] || "";
+  const servicesOf = (s) => T.types[s.type] || state.types[s.type] || "";
   const servicesLines = (s) => servicesOf(s).split(",").map((x) => x.trim()).filter(Boolean);
   const routeUrl = (s) => `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}`;
   const fullAddress = (s) => `${s.address}, ${s.cp} ${s.city}`;
@@ -107,7 +159,7 @@
     const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
     return 2 * R * Math.asin(Math.sqrt(a));
   }
-  const fmtDist = (km) => km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(km < 10 ? 1 : 0).replace(".", ",")} km`;
+  const fmtDist = (km) => km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(km < 10 ? 1 : 0).replace(".", T.decimal)} km`;
 
   // ---------- Carte ----------------------------------------------------------
   function pinSvg(color) {
@@ -133,15 +185,7 @@
       maxZoom: CONFIG.maxZoom,
       attributionControl: { compact: true },
       cooperativeGestures: CONFIG.cooperativeGestures,
-      locale: {
-        "NavigationControl.ZoomIn": "Zoom avant",
-        "NavigationControl.ZoomOut": "Zoom arrière",
-        "AttributionControl.ToggleAttribution": "Afficher les sources",
-        "Popup.Close": "Fermer",
-        "CooperativeGesturesHandler.WindowsHelpText": "Utilisez Ctrl + molette pour zoomer la carte",
-        "CooperativeGesturesHandler.MacHelpText": "Utilisez ⌘ + molette pour zoomer la carte",
-        "CooperativeGesturesHandler.MobileHelpText": "Utilisez deux doigts pour déplacer la carte",
-      },
+      locale: T.mapLocale,
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
     map.touchPitch.disable();
@@ -250,7 +294,8 @@
     }
     inView.sort((a, b2) => a.dist - b2.dist);
     state.visible = inView;
-    setStatus(originInView ? CONFIG.labels.nearOrigin(nf.format(inView.length)) : CONFIG.labels.inView(nf.format(inView.length)));
+    const n = inView.length, f = nf.format(n);
+    setStatus(originInView ? CONFIG.labels.nearOrigin(n, f) : CONFIG.labels.inView(n, f));
     renderList(true);
   }
 
@@ -272,7 +317,7 @@
     node.querySelector(".sl-card__title").textContent = "PCS Store";
     node.querySelector(".sl-card__addr").innerHTML = `${esc(s.address)}<br>${esc(s.cp)} ${esc(s.city)}`;
     node.querySelector(".sl-card__services").innerHTML = servicesLines(s).map(esc).join("<br>");
-    node.querySelector(".sl-card__dist").textContent = s.dist != null ? `à ${fmtDist(s.dist)}` : "";
+    node.querySelector(".sl-card__dist").textContent = s.dist != null ? CONFIG.labels.distance(fmtDist(s.dist)) : "";
     node.querySelector('[data-action="route"]').href = routeUrl(s);
     return node;
   }
@@ -366,7 +411,7 @@
     q = q.trim();
     if (q.length < 2) return;
     hideSuggestions();
-    setStatus("Recherche…");
+    setStatus(CONFIG.labels.searching);
     try {
       const [f] = await geocode(q, { limit: 1 });
       if (!f) { setStatus(CONFIG.labels.notFound, true); return; }
@@ -386,16 +431,19 @@
   }
 
   // Suggestions
-  let debounceTimer, activeIndex = -1, suggestions = [];
+  let debounceTimer, activeIndex = -1, suggestions = [], suggestSeq = 0;
   el.input.addEventListener("input", () => {
     clearTimeout(debounceTimer);
     const q = el.input.value.trim();
     if (q.length < 3) { hideSuggestions(); return; }
+    const seq = ++suggestSeq;
     debounceTimer = setTimeout(async () => {
       try {
-        suggestions = await geocode(q, { autocomplete: true, limit: 5 });
+        const found = await geocode(q, { autocomplete: true, limit: 5 });
+        if (seq !== suggestSeq) return;          // recherche validée ou saisie modifiée entre-temps
+        suggestions = found;
         showSuggestions();
-      } catch { hideSuggestions(); }
+      } catch { if (seq === suggestSeq) hideSuggestions(); }
     }, 250);
   });
 
@@ -412,6 +460,7 @@
     el.input.setAttribute("aria-expanded", "true");
   }
   function hideSuggestions() {
+    clearTimeout(debounceTimer); suggestSeq++;    // invalide toute suggestion en attente
     el.suggest.hidden = true; el.suggest.innerHTML = ""; activeIndex = -1;
     el.input.setAttribute("aria-expanded", "false");
   }
@@ -501,7 +550,7 @@
       updateMapData();
       refreshList();
       // Petite API publique (debug, ou pilotage depuis la page parente via postMessage si besoin).
-      window.storeLocator = { map, search, select, state, CONFIG };
+      window.storeLocator = { map, search, select, state, CONFIG, lang: LANG };
       const q = new URLSearchParams(location.search).get("q");
       if (q) { el.input.value = q; search(q); }
     } catch (e) {
