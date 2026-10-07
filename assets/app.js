@@ -124,13 +124,77 @@
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const setStatus = (msg, isError = false) => { el.status.textContent = msg; el.status.classList.toggle("is-error", isError); };
 
+  // ---------- Tracking : postMessage vers la page parente ---------------------
+  // Contrat : { source: "pcs-store-locator", event, event_data } ; la page Webflow parente
+  // écoute ces messages et les pousse dans son dataLayer (GTM). Rien n'est écrit dans
+  // l'iframe (pas de dataLayer, pas de GTM) et aucune coordonnée GPS / donnée perso ne part.
+  // Événements : store_locator_search { search_method, search_term, search_status }
+  //              store_locator_select { store_name, store_city, selection_method }
+  const DEBUG = new URLSearchParams(location.search).has("debug");
+  const track = {
+    pending: null,          // recherche lancée, émise quand ses résultats sont affichés
+    pendingTimer: null,
+    lastSearchKey: null,    // anti-doublon : même méthode + terme + statut => pas de renvoi
+    lastSelect: { id: null, at: 0 },
+  };
+  const normalize = (str) => (str || "")
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[’']/g, " ")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 100);
+  // "Paris 11", "Lyon 1er", "Marseille 3eme" -> "Paris", "Lyon", "Marseille"
+  const cityOnly = (city) => (city || "").replace(/\s+\d{1,2}\s*(?:er|e|eme|ème)?\s*$/i, "");
+  const isPostcode = (t) => /^\d{4,5}$/.test((t || "").trim());   // FR/ES 5 chiffres, BE 4
+
+  function pcsTrack(event, event_data) {
+    if (DEBUG) console.debug("[pcs-store-locator]", event, event_data);
+    if (window.parent === window) return;       // hors iframe : rien à envoyer
+    try { window.parent.postMessage({ source: "pcs-store-locator", event, event_data }, "*"); } catch { /* ignore */ }
+  }
+
+  // Déclare une recherche utilisateur ; l'événement part depuis refreshList() une fois la
+  // liste affichée (succes / aucun_resultat), ou tout de suite via flushSearch("erreur").
+  function trackSearchStart(method, term) {
+    const search_term = method === "geolocalisation" ? "geolocalisation"
+      : method === "code_postal" ? (term || "").trim()
+      : normalize(term);
+    track.pending = { search_method: method, search_term };
+    clearTimeout(track.pendingTimer);
+    // Filet de sécurité si aucun "moveend" n'arrive : on recalcule la liste, ce qui émet l'événement.
+    track.pendingTimer = setTimeout(() => { if (track.pending) refreshList(); }, 6000);
+  }
+  function flushSearch(status) {
+    const p = track.pending;
+    if (!p) return;
+    clearTimeout(track.pendingTimer);
+    track.pending = null;
+    const key = `${p.search_method}|${p.search_term}|${status}`;
+    if (key === track.lastSearchKey) return;    // recherche identique à la précédente : pas de doublon
+    track.lastSearchKey = key;
+    pcsTrack("store_locator_search", { search_method: p.search_method, search_term: p.search_term, search_status: status });
+  }
+  // Sélection par l'utilisateur uniquement (liste ou carte) ; jamais pour select() appelé par du code.
+  function trackSelect(s, method) {
+    const now = Date.now();
+    if (track.lastSelect.id === s.id && now - track.lastSelect.at < 2000) return;
+    track.lastSelect = { id: s.id, at: now };
+    pcsTrack("store_locator_select", {
+      store_name: normalize(s.name),
+      store_city: normalize(cityOnly(s.city)),
+      selection_method: method,
+    });
+  }
+
   // ---------- Données --------------------------------------------------------
   async function loadData() {
     const res = await fetch(CONFIG.dataUrl);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
     state.types = json.types || {};
-    state.stores = json.stores.map(([id, type, address, cp, city, lng, lat]) => ({ id, type, address, cp, city, lng, lat }));
+    state.stores = json.stores.map(([id, type, address, cp, city, lng, lat, name]) =>
+      ({ id, type, address, cp, city, lng, lat, name: name || "PCS Store" }));
     state.byId = new Map(state.stores.map((s) => [s.id, s]));
   }
 
@@ -242,7 +306,7 @@
     });
     map.on("click", "points", (e) => {
       const f = e.features && e.features[0];
-      if (f) select(f.properties.id, { fromMap: true });
+      if (f) select(f.properties.id, { fromMap: true, source: "carte" });
     });
     for (const layer of ["clusters", "points"]) {
       map.on("mouseenter", layer, () => (map.getCanvas().style.cursor = "pointer"));
@@ -271,12 +335,13 @@
   function refreshList() {
     if (!state.mapReady) return;
     if (!state.filter[1] && !state.filter[2]) {
-      state.visible = []; renderList(true); setStatus(CONFIG.labels.noFilter); return;
+      state.visible = []; renderList(true); setStatus(CONFIG.labels.noFilter); flushSearch("aucun_resultat"); return;
     }
     const zoom = map.getZoom();
     if (zoom < CONFIG.listMinZoom && !state.origin) {
       state.visible = []; renderList(true);
       setStatus(CONFIG.labels.hint(nf.format(state.stores.length)));
+      flushSearch("aucun_resultat");
       return;
     }
 
@@ -297,6 +362,7 @@
     const n = inView.length, f = nf.format(n);
     setStatus(originInView ? CONFIG.labels.nearOrigin(n, f) : CONFIG.labels.inView(n, f));
     renderList(true);
+    flushSearch(n ? "succes" : "aucun_resultat");
   }
 
   function renderList(reset) {
@@ -314,7 +380,7 @@
     const node = el.tpl.content.firstElementChild.cloneNode(true);
     node.dataset.id = s.id;
     node.dataset.type = s.type;
-    node.querySelector(".sl-card__title").textContent = "PCS Store";
+    node.querySelector(".sl-card__title").textContent = s.name;
     node.querySelector(".sl-card__addr").innerHTML = `${esc(s.address)}<br>${esc(s.cp)} ${esc(s.city)}`;
     node.querySelector(".sl-card__services").innerHTML = servicesLines(s).map(esc).join("<br>");
     node.querySelector(".sl-card__dist").textContent = s.dist != null ? CONFIG.labels.distance(fmtDist(s.dist)) : "";
@@ -331,14 +397,16 @@
     if (!btn) return;
     const id = Number(btn.closest(".sl-card").dataset.id);
     setView("map");
-    select(id, { fly: true });
+    select(id, { fly: true, source: "liste" });
   });
   el.more.addEventListener("click", () => renderList(false));
 
   // ---------- Sélection + popup ---------------------------------------------
-  function select(id, { fromMap = false, fly = false } = {}) {
+  // source : "liste" | "carte" pour un clic utilisateur (tracké), null pour un appel programmatique.
+  function select(id, { fromMap = false, fly = false, source = null } = {}) {
     const s = state.byId.get(id);
     if (!s) return;
+    if (source) trackSelect(s, source);
     state.selectedId = id;
     applySelectedStyle();
     highlightCard();
@@ -360,7 +428,7 @@
     if (popup) popup.remove();
     const html = `
       <div class="sl-pop">
-        <h3>PCS Store</h3>
+        <h3>${esc(s.name)}</h3>
         <p>${esc(s.address)}<br>${esc(s.cp)} ${esc(s.city)}</p>
         <p class="sl-pop__services">${esc(servicesOf(s))}</p>
         <div class="sl-pop__actions">
@@ -412,12 +480,14 @@
     if (q.length < 2) return;
     hideSuggestions();
     setStatus(CONFIG.labels.searching);
+    trackSearchStart(isPostcode(q) ? "code_postal" : "ville", q);
     try {
       const [f] = await geocode(q, { limit: 1 });
-      if (!f) { setStatus(CONFIG.labels.notFound, true); return; }
+      if (!f) { setStatus(CONFIG.labels.notFound, true); flushSearch("aucun_resultat"); return; }
       goToPlace(f);
     } catch {
       setStatus(CONFIG.labels.geocodeError, true);
+      flushSearch("erreur");
     }
   }
 
@@ -467,8 +537,11 @@
   function pickSuggestion(i) {
     const f = suggestions[i];
     if (!f) return;
-    el.input.value = f.properties.label;
+    const typed = el.input.value.trim(), p = f.properties;
+    el.input.value = p.label;
     hideSuggestions();
+    if (isPostcode(typed)) trackSearchStart("code_postal", p.postcode || typed);
+    else trackSearchStart("ville", p.city || p.name || p.label);
     goToPlace(f);
   }
   el.suggest.addEventListener("mousedown", (e) => {
@@ -493,7 +566,8 @@
 
   // ---------- Géolocalisation ------------------------------------------------
   el.geoloc.addEventListener("click", () => {
-    if (!navigator.geolocation) { setStatus(CONFIG.labels.geolocError, true); return; }
+    trackSearchStart("geolocalisation");
+    if (!navigator.geolocation) { setStatus(CONFIG.labels.geolocError, true); flushSearch("erreur"); return; }
     el.geoloc.classList.add("is-busy");
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -507,6 +581,7 @@
       (err) => {
         el.geoloc.classList.remove("is-busy");
         setStatus(err.code === err.PERMISSION_DENIED ? CONFIG.labels.geolocDenied : CONFIG.labels.geolocError, true);
+        flushSearch("erreur");
       },
       { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
     );

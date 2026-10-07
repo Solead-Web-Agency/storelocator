@@ -60,6 +60,33 @@ Ajouter un élément **Embed** (code HTML) dans la page Webflow :
   Désactivable avec `cooperativeGestures: false` dans `CONFIG`.
 - L'application expose `window.storeLocator` (`map`, `search(q)`, `select(id)`) pour un pilotage éventuel.
 
+## Tracking (postMessage vers la page parente)
+
+L'app n'embarque ni GTM ni `dataLayer`. À chaque recherche et à chaque sélection, elle envoie un
+`postMessage` à la page parente, qui le pousse dans son `dataLayer` :
+
+```js
+{ source: "pcs-store-locator", event: "store_locator_search", event_data: { search_method, search_term, search_status } }
+{ source: "pcs-store-locator", event: "store_locator_select", event_data: { store_name, store_city, selection_method } }
+```
+
+- `search_method` : `code_postal` (saisie de 4 ou 5 chiffres), `ville` (autre saisie ou suggestion), `geolocalisation`.
+- `search_term` : le code postal tel quel, la ville normalisée (`saint_etienne`), ou la chaîne `geolocalisation`.
+- `search_status` : `succes` (≥ 1 point de vente listé), `aucun_resultat` (0 point de vente, ou adresse non reconnue),
+  `erreur` (géocodeur injoignable, géolocalisation refusée ou indisponible).
+- `store_name` : colonne `Nom` de l'export, normalisée (`pcs_store` tant que l'export ne contient pas de nom propre).
+- `store_city` : colonne `Ville` de l'export, sans numéro d'arrondissement, normalisée (`paris`, `lyon`).
+- `selection_method` : `liste` (bouton d'une carte de la liste) ou `carte` (clic sur un marqueur).
+- Pas de doublon : une recherche identique à la précédente (même méthode, terme et statut) n'est pas renvoyée ;
+  une re-sélection du même point de vente dans les 2 secondes non plus.
+- Hors iframe, rien n'est envoyé. Avec `?debug=1` dans l'URL, les événements sont aussi affichés en `console.debug`.
+- Les recherches lancées par `?q=` ou par `window.storeLocator.search()` sont trackées ; les sélections faites par
+  `window.storeLocator.select()` ne le sont pas (uniquement les clics utilisateur).
+
+URL de production stable de l'app : https://storelocator-alpha.vercel.app (alias Vercel du projet ; les URL
+`storelocator-xxxx-solead-agency.vercel.app` changent à chaque déploiement). C'est celle-ci que l'iframe Webflow
+et le filtre d'origine du listener parent doivent utiliser.
+
 ## Personnaliser
 
 - Textes et URL « Ouvrir un compte » par langue : table `I18N` ; zooms, couleurs des pins : objet `CONFIG`, en tête de `assets/app.js`.

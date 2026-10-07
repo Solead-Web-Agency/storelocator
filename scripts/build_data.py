@@ -13,7 +13,7 @@ Format de sortie :
       "source": "PCS_liste store_20260907.csv",
       "count": 28410,
       "types": {"1": "Recharge", "2": "Recharge, Vente de carte"},
-      "stores": [[id, type, adresse, code_postal, ville, lng, lat], ...]
+      "stores": [[id, type, adresse, code_postal, ville, lng, lat(, nom)], ...]
     }
 """
 import csv
@@ -115,7 +115,7 @@ def main():
                 continue
             infos = (r.get("Infos") or "").strip().lower()
             typ = 2 if infos.startswith("cartes") else 1
-            stores.append([
+            row = [
                 int(sid),
                 typ,
                 clean_address(r.get("Adresse")),
@@ -123,7 +123,13 @@ def main():
                 title_fr(r.get("Ville")),
                 round(lng, 5),
                 round(lat, 5),
-            ])
+            ]
+            # 8e champ optionnel : nom du point de vente s'il est renseigné dans l'export
+            # (sinon l'app affiche "PCS Store" et le tracking envoie store_name = "pcs_store").
+            nom = re.sub(r"\s+", " ", (r.get("Nom") or "").strip())
+            if nom and nom.lower() != "pcs store":
+                row.append(nom)
+            stores.append(row)
 
     stores.sort(key=lambda s: (s[3], s[2]))
     payload = {
