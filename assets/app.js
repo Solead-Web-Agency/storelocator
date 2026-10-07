@@ -154,16 +154,32 @@
     try { window.parent.postMessage({ source: "pcs-store-locator", event, event_data }, "*"); } catch { /* ignore */ }
   }
 
-  // Déclare une recherche utilisateur ; l'événement part depuis refreshList() une fois la
-  // liste affichée (succes / aucun_resultat), ou tout de suite via flushSearch("erreur").
+  // Cycle d'une recherche trackée :
+  //  1. trackSearchStart() : la recherche est déclarée, mais pas encore « armée ».
+  //     Tant qu'elle ne l'est pas (géocodage en cours, fenêtre d'autorisation de géolocalisation
+  //     ouverte…), refreshList() ne la consomme pas.
+  //  2. armPendingSearch() : appelé juste après le flyTo vers le résultat. Le "moveend" de fin de
+  //     vol appelle refreshList(), qui émet succes / aucun_resultat selon la liste affichée.
+  //  3. flushSearch("erreur" | "aucun_resultat") direct si le géocodage échoue ou ne trouve rien.
   function trackSearchStart(method, term) {
     const search_term = method === "geolocalisation" ? "geolocalisation"
       : method === "code_postal" ? (term || "").trim()
       : normalize(term);
-    track.pending = { search_method: method, search_term };
+    clearTimeout(track.pendingTimer);
+    track.pending = { search_method: method, search_term, armed: false };
+  }
+  function armPendingSearch() {
+    if (!track.pending) return;
+    track.pending.armed = true;
     clearTimeout(track.pendingTimer);
     // Filet de sécurité si aucun "moveend" n'arrive : on recalcule la liste, ce qui émet l'événement.
     track.pendingTimer = setTimeout(() => { if (track.pending) refreshList(); }, 6000);
+    // Animation désactivée (prefers-reduced-motion) : le flyTo est instantané et son moveend est déjà passé.
+    if (!map.isMoving()) refreshList();
+  }
+  // Appelé par refreshList() : n'émet que pour une recherche armée (résultat atteint et liste à jour).
+  function flushSearchFromList(status) {
+    if (track.pending && track.pending.armed) flushSearch(status);
   }
   function flushSearch(status) {
     const p = track.pending;
@@ -335,13 +351,13 @@
   function refreshList() {
     if (!state.mapReady) return;
     if (!state.filter[1] && !state.filter[2]) {
-      state.visible = []; renderList(true); setStatus(CONFIG.labels.noFilter); flushSearch("aucun_resultat"); return;
+      state.visible = []; renderList(true); setStatus(CONFIG.labels.noFilter); flushSearchFromList("aucun_resultat"); return;
     }
     const zoom = map.getZoom();
     if (zoom < CONFIG.listMinZoom && !state.origin) {
       state.visible = []; renderList(true);
       setStatus(CONFIG.labels.hint(nf.format(state.stores.length)));
-      flushSearch("aucun_resultat");
+      flushSearchFromList("aucun_resultat");
       return;
     }
 
@@ -362,7 +378,7 @@
     const n = inView.length, f = nf.format(n);
     setStatus(originInView ? CONFIG.labels.nearOrigin(n, f) : CONFIG.labels.inView(n, f));
     renderList(true);
-    flushSearch(n ? "succes" : "aucun_resultat");
+    flushSearchFromList(n ? "succes" : "aucun_resultat");
   }
 
   function renderList(reset) {
@@ -497,7 +513,7 @@
     setOrigin([lng, lat]);
     state.selectedId = null; if (popup) popup.remove();
     map.flyTo({ center: [lng, lat], zoom, speed: 1.6, essential: true });
-    // refreshList est déclenché par "moveend".
+    armPendingSearch();   // refreshList et l'événement de recherche suivront au moveend
   }
 
   // Suggestions
@@ -566,6 +582,8 @@
 
   // ---------- Géolocalisation ------------------------------------------------
   el.geoloc.addEventListener("click", () => {
+    // Recherche déclarée au clic mais armée seulement quand la position est obtenue :
+    // l'utilisateur peut laisser la fenêtre d'autorisation ouverte aussi longtemps qu'il veut.
     trackSearchStart("geolocalisation");
     if (!navigator.geolocation) { setStatus(CONFIG.labels.geolocError, true); flushSearch("erreur"); return; }
     el.geoloc.classList.add("is-busy");
@@ -576,11 +594,14 @@
         el.input.value = "";
         setOrigin(lngLat);
         state.selectedId = null; if (popup) popup.remove();
+        if (!track.pending || track.pending.search_method !== "geolocalisation") trackSearchStart("geolocalisation");
         map.flyTo({ center: lngLat, zoom: CONFIG.geolocZoom, speed: 1.6, essential: true });
+        armPendingSearch();
       },
       (err) => {
         el.geoloc.classList.remove("is-busy");
         setStatus(err.code === err.PERMISSION_DENIED ? CONFIG.labels.geolocDenied : CONFIG.labels.geolocError, true);
+        if (!track.pending || track.pending.search_method !== "geolocalisation") trackSearchStart("geolocalisation");
         flushSearch("erreur");
       },
       { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
