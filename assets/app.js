@@ -31,8 +31,13 @@
         loadError: "Impossible de charger les points de vente. Réessayez plus tard.",
         searching: "Recherche…",
         hint: (total) => `${total} points de vente en France. Recherchez une ville ou zoomez sur la carte.`,
-        inView: (n, f) => n === 0 ? "Aucun point de vente dans cette zone." : `${f} point${n > 1 ? "s" : ""} de vente dans cette zone.`,
-        nearOrigin: (n, f) => n === 0 ? "Aucun point de vente autour de votre recherche." : `${f} point${n > 1 ? "s" : ""} de vente autour de votre recherche.`,
+        // n = nombre de points listés (au plus CONFIG.maxResults), f = n formaté, more = d'autres points sont visibles sur la carte
+        inView: (n, f, more) => n === 0 ? "Aucun point de vente dans cette zone."
+          : more ? `Les ${f} points de vente les plus proches du centre de la carte.`
+          : `${f} point${n > 1 ? "s" : ""} de vente dans cette zone.`,
+        nearOrigin: (n, f, more) => n === 0 ? "Aucun point de vente autour de votre recherche."
+          : more ? `Les ${f} points de vente les plus proches de votre recherche.`
+          : `${f} point${n > 1 ? "s" : ""} de vente autour de votre recherche.`,
         noFilter: "Sélectionnez un service dans la légende.",
         notFound: "Adresse introuvable. Essayez une ville ou un code postal.",
         geocodeError: "Le service de recherche est indisponible. Réessayez.",
@@ -55,8 +60,12 @@
         loadError: "Unable to load the stores. Please try again later.",
         searching: "Searching…",
         hint: (total) => `${total} stores in France. Search for a city or zoom in on the map.`,
-        inView: (n, f) => n === 0 ? "No stores in this area." : `${f} store${n > 1 ? "s" : ""} in this area.`,
-        nearOrigin: (n, f) => n === 0 ? "No stores near your search." : `${f} store${n > 1 ? "s" : ""} near your search.`,
+        inView: (n, f, more) => n === 0 ? "No stores in this area."
+          : more ? `The ${f} stores closest to the centre of the map.`
+          : `${f} store${n > 1 ? "s" : ""} in this area.`,
+        nearOrigin: (n, f, more) => n === 0 ? "No stores near your search."
+          : more ? `The ${f} stores closest to your search.`
+          : `${f} store${n > 1 ? "s" : ""} near your search.`,
         noFilter: "Select a service in the legend.",
         notFound: "Address not found. Try a city or a postcode.",
         geocodeError: "The search service is unavailable. Please try again.",
@@ -88,7 +97,8 @@
     initialZoom: 5.2,
     maxZoom: 18,
     listMinZoom: 9,          // en dessous, on invite à zoomer / chercher
-    pageSize: 40,            // cartes affichées avant "Afficher plus"
+    maxResults: 10,          // la liste ne montre que les N points visibles les plus proches (la carte les montre tous)
+    pageSize: 40,            // cartes affichées avant "Afficher plus" (sans effet tant que maxResults <= pageSize)
     zoomByPlaceType: { municipality: 12, locality: 14, street: 14, housenumber: 15, default: 13 },
     geolocZoom: 13,
     pins: { 1: "#7a7a7a", 2: "#e3262b" },
@@ -374,9 +384,9 @@
       inView.push(s);
     }
     inView.sort((a, b2) => a.dist - b2.dist);
-    state.visible = inView;
-    const n = inView.length, f = nf.format(n);
-    setStatus(originInView ? CONFIG.labels.nearOrigin(n, f) : CONFIG.labels.inView(n, f));
+    state.visible = inView.slice(0, CONFIG.maxResults);
+    const n = state.visible.length, f = nf.format(n), more = inView.length > n;
+    setStatus(originInView ? CONFIG.labels.nearOrigin(n, f, more) : CONFIG.labels.inView(n, f, more));
     renderList(true);
     flushSearchFromList(n ? "succes" : "aucun_resultat");
   }

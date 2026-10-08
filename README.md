@@ -9,7 +9,8 @@ en iframe dans Webflow.
   `I18N` de `assets/app.js`, les textes HTML dans chaque `index.html` (à garder synchronisés).
 - Carte : [MapLibre GL](https://maplibre.org/) avec le fond clair « positron » d'[OpenFreeMap](https://openfreemap.org/) (gratuit, sans clé).
 - Recherche : géocodeur adresses de l'État (Géoplateforme IGN, repli sur l'API Adresse BAN), gratuit et sans clé.
-- Regroupement automatique des 28 000 points en clusters, liste des boutiques triée par distance.
+- Regroupement automatique des 28 000 points en clusters. La liste ne montre que les 10 points de vente visibles
+  les plus proches de la recherche (ou du centre de la carte) ; la carte, elle, les affiche tous (`maxResults` dans `CONFIG`).
 
 ## Mettre à jour les données
 
