@@ -56,7 +56,6 @@ Ajouter un élément **Embed** (code HTML) dans la page Webflow :
 - `allow="geolocation"` est nécessaire pour le bouton « Autour de moi ».
 - Version anglaise : même iframe avec `src="https://VOTRE-DOMAINE/storelocator/en/"`.
 - On peut pré-remplir une recherche : `.../storelocator/?q=Lyon`.
-- Le bouton « Ouvrir un compte » s'ouvre dans la page parente (`target="_top"`).
 - La molette seule fait défiler la page Webflow ; Ctrl/⌘ + molette zoome la carte (deux doigts sur mobile).
   Désactivable avec `cooperativeGestures: false` dans `CONFIG`.
 - L'application expose `window.storeLocator` (`map`, `search(q)`, `select(id)`) pour un pilotage éventuel.
@@ -90,6 +89,6 @@ et le filtre d'origine du listener parent doivent utiliser.
 
 ## Personnaliser
 
-- Textes et URL « Ouvrir un compte » par langue : table `I18N` ; zooms, couleurs des pins : objet `CONFIG`, en tête de `assets/app.js`.
+- Textes par langue : table `I18N` ; zooms, couleurs des pins : objet `CONFIG`, en tête de `assets/app.js`.
 - Couleurs, polices, rayons : variables `:root` en tête de `assets/app.css`.
 - Libellés des boutons des cartes : dans le `<template id="tpl-card">` de `index.html` et `en/index.html`.

@@ -16,7 +16,6 @@
       numberLocale: "fr-FR",
       decimal: ",",
       types: { 1: "Recharge", 2: "Recharge, Vente de carte" },
-      openAccountUrl: "https://www.mypcs.com/",
       mapLocale: {
         "NavigationControl.ZoomIn": "Zoom avant",
         "NavigationControl.ZoomOut": "Zoom arrière",
@@ -53,7 +52,6 @@
       numberLocale: "en-GB",
       decimal: ".",
       types: { 1: "Top-up", 2: "Top-up, Card sales" },
-      openAccountUrl: "https://www.mypcs.com/en/",
       mapLocale: undefined, // textes MapLibre par défaut (anglais)
       labels: {
         loading: "Loading stores…",
@@ -89,7 +87,6 @@
       "https://data.geopf.fr/geocodage/search",
       "https://api-adresse.data.gouv.fr/search/",
     ],
-    openAccountUrl: T.openAccountUrl,
     // true : molette = défilement de la page, Ctrl/⌘ + molette = zoom ; deux doigts sur mobile.
     // Recommandé en iframe pour ne pas bloquer le défilement de la page Webflow.
     cooperativeGestures: true,
@@ -111,9 +108,8 @@
   const el = {
     app: $("app"), form: $("search-form"), input: $("search-input"), suggest: $("suggestions"),
     geoloc: $("geoloc-btn"), status: $("status"), list: $("list"), more: $("more"),
-    legend: $("legend"), tpl: $("tpl-card"), openAccount: $("open-account"),
+    legend: $("legend"), tpl: $("tpl-card"),
   };
-  el.openAccount.href = CONFIG.openAccountUrl;
 
   // ---------- État -----------------------------------------------------------
   const state = {
@@ -588,7 +584,13 @@
     }
   });
   el.input.addEventListener("blur", () => setTimeout(hideSuggestions, 150));
-  el.form.addEventListener("submit", (e) => { e.preventDefault(); search(el.input.value); });
+  // Validation du champ : touche Entrée ou bouton « Rechercher ».
+  el.form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    if (el.input.value.trim().length < 2) { el.input.focus(); return; }
+    el.input.blur();              // ferme le clavier sur mobile
+    search(el.input.value);
+  });
 
   // ---------- Géolocalisation ------------------------------------------------
   el.geoloc.addEventListener("click", () => {
