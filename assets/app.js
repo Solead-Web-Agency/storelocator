@@ -29,14 +29,11 @@
         loading: "Chargement des points de vente…",
         loadError: "Impossible de charger les points de vente. Réessayez plus tard.",
         searching: "Recherche…",
-        hint: (total) => `${total} points de vente en France. Recherchez une ville ou zoomez sur la carte.`,
-        // n = nombre de points listés (au plus CONFIG.maxResults), f = n formaté, more = d'autres points sont visibles sur la carte
-        inView: (n, f, more) => n === 0 ? "Aucun point de vente dans cette zone."
-          : more ? `Les ${f} points de vente les plus proches du centre de la carte.`
-          : `${f} point${n > 1 ? "s" : ""} de vente dans cette zone.`,
-        nearOrigin: (n, f, more) => n === 0 ? "Aucun point de vente autour de votre recherche."
-          : more ? `Les ${f} points de vente les plus proches de votre recherche.`
-          : `${f} point${n > 1 ? "s" : ""} de vente autour de votre recherche.`,
+        hint: () => "Saisissez une ville, un code postal ou une adresse, ou utilisez la géolocalisation, pour afficher les points de vente les plus proches.",
+        // n = nombre de points affichés, f = n formaté, km = rayon maximal, full = la limite de résultats est atteinte
+        nearOrigin: (n, f, km, full) => n === 0 ? `Aucun point de vente à moins de ${km} km de votre recherche.`
+          : full ? `Les ${f} points de vente les plus proches de votre recherche.`
+          : `${f} point${n > 1 ? "s" : ""} de vente à moins de ${km} km de votre recherche.`,
         noFilter: "Sélectionnez un service dans la légende.",
         notFound: "Adresse introuvable. Essayez une ville ou un code postal.",
         geocodeError: "Le service de recherche est indisponible. Réessayez.",
@@ -57,13 +54,10 @@
         loading: "Loading stores…",
         loadError: "Unable to load the stores. Please try again later.",
         searching: "Searching…",
-        hint: (total) => `${total} stores in France. Search for a city or zoom in on the map.`,
-        inView: (n, f, more) => n === 0 ? "No stores in this area."
-          : more ? `The ${f} stores closest to the centre of the map.`
-          : `${f} store${n > 1 ? "s" : ""} in this area.`,
-        nearOrigin: (n, f, more) => n === 0 ? "No stores near your search."
-          : more ? `The ${f} stores closest to your search.`
-          : `${f} store${n > 1 ? "s" : ""} near your search.`,
+        hint: () => "Enter a city, a postcode or an address, or use your location, to see the nearest stores.",
+        nearOrigin: (n, f, km, full) => n === 0 ? `No stores within ${km} km of your search.`
+          : full ? `The ${f} stores closest to your search.`
+          : `${f} store${n > 1 ? "s" : ""} within ${km} km of your search.`,
         noFilter: "Select a service in the legend.",
         notFound: "Address not found. Try a city or a postcode.",
         geocodeError: "The search service is unavailable. Please try again.",
@@ -93,13 +87,14 @@
     initialCenter: [2.5, 46.6],
     initialZoom: 5.2,
     maxZoom: 18,
-    listMinZoom: 9,          // en dessous, on invite à zoomer / chercher
-    maxResults: 10,          // la liste ne montre que les N points visibles les plus proches (la carte les montre tous)
+    // Rien n'est affiché tant qu'aucune adresse ni position n'est donnée. Ensuite, la carte et la liste
+    // montrent les maxResults points de vente les plus proches, dans un rayon de maxDistanceKm.
+    maxResults: 10,
+    maxDistanceKm: 50,
+    fitMaxZoom: 16,          // zoom maximal quand la carte se cadre sur les résultats
     pageSize: 40,            // cartes affichées avant "Afficher plus" (sans effet tant que maxResults <= pageSize)
-    zoomByPlaceType: { municipality: 12, locality: 14, street: 14, housenumber: 15, default: 13 },
     geolocZoom: 13,
     pins: { 1: "#7a7a7a", 2: "#e3262b" },
-    clusterColor: "#2b2b2b",
     labels: T.labels,
   };
 
@@ -139,7 +134,6 @@
   const DEBUG = new URLSearchParams(location.search).has("debug");
   const track = {
     pending: null,          // recherche lancée, émise quand ses résultats sont affichés
-    pendingTimer: null,
     lastSearchKey: null,    // anti-doublon : même méthode + terme + statut => pas de renvoi
     lastSelect: { id: null, at: 0 },
   };
@@ -161,36 +155,21 @@
   }
 
   // Cycle d'une recherche trackée :
-  //  1. trackSearchStart() : la recherche est déclarée, mais pas encore « armée ».
-  //     Tant qu'elle ne l'est pas (géocodage en cours, fenêtre d'autorisation de géolocalisation
-  //     ouverte…), refreshList() ne la consomme pas.
-  //  2. armPendingSearch() : appelé juste après le flyTo vers le résultat. Le "moveend" de fin de
-  //     vol appelle refreshList(), qui émet succes / aucun_resultat selon la liste affichée.
-  //  3. flushSearch("erreur" | "aucun_resultat") direct si le géocodage échoue ou ne trouve rien.
+  //  1. trackSearchStart() déclare la recherche (saisie validée, suggestion choisie, clic géolocalisation).
+  //  2. Une fois l'adresse ou la position obtenue, showResults() affiche les résultats et
+  //     flushSearch("succes" | "aucun_resultat") émet l'événement.
+  //  3. flushSearch("erreur" | "aucun_resultat") direct si le géocodage échoue / ne trouve rien,
+  //     ou si la géolocalisation est refusée. Tant que rien de tout cela n'arrive (fenêtre
+  //     d'autorisation de géolocalisation ouverte…), aucun événement ne part.
   function trackSearchStart(method, term) {
     const search_term = method === "geolocalisation" ? "geolocalisation"
       : method === "code_postal" ? (term || "").trim()
       : normalize(term);
-    clearTimeout(track.pendingTimer);
-    track.pending = { search_method: method, search_term, armed: false };
-  }
-  function armPendingSearch() {
-    if (!track.pending) return;
-    track.pending.armed = true;
-    clearTimeout(track.pendingTimer);
-    // Filet de sécurité si aucun "moveend" n'arrive : on recalcule la liste, ce qui émet l'événement.
-    track.pendingTimer = setTimeout(() => { if (track.pending) refreshList(); }, 6000);
-    // Animation désactivée (prefers-reduced-motion) : le flyTo est instantané et son moveend est déjà passé.
-    if (!map.isMoving()) refreshList();
-  }
-  // Appelé par refreshList() : n'émet que pour une recherche armée (résultat atteint et liste à jour).
-  function flushSearchFromList(status) {
-    if (track.pending && track.pending.armed) flushSearch(status);
+    track.pending = { search_method: method, search_term };
   }
   function flushSearch(status) {
     const p = track.pending;
     if (!p) return;
-    clearTimeout(track.pendingTimer);
     track.pending = null;
     const key = `${p.search_method}|${p.search_term}|${status}`;
     if (key === track.lastSearchKey) return;    // recherche identique à la précédente : pas de doublon
@@ -232,7 +211,6 @@
     };
   }
 
-  const filteredStores = () => state.stores.filter((s) => state.filter[s.type]);
   const servicesOf = (s) => T.types[s.type] || state.types[s.type] || "";
   const servicesLines = (s) => servicesOf(s).split(",").map((x) => x.trim()).filter(Boolean);
   const routeUrl = (s) => `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}`;
@@ -284,30 +262,11 @@
       map.addImage(`pin-${type}`, await loadImage(pinSvg(color), 28, 36), { pixelRatio: 2 });
     }
 
-    map.addSource("stores", {
-      type: "geojson",
-      data: toGeoJSON(filteredStores()),
-      cluster: true,
-      clusterMaxZoom: 13,
-      clusterRadius: 48,
-    });
+    // La source ne contient que les résultats de la recherche en cours (vide à l'ouverture).
+    map.addSource("stores", { type: "geojson", data: toGeoJSON([]) });
 
     map.addLayer({
-      id: "clusters", type: "circle", source: "stores", filter: ["has", "point_count"],
-      paint: {
-        "circle-color": CONFIG.clusterColor,
-        "circle-radius": ["step", ["get", "point_count"], 16, 50, 20, 500, 25, 5000, 30],
-        "circle-stroke-width": 3,
-        "circle-stroke-color": "rgba(255,255,255,0.9)",
-      },
-    });
-    map.addLayer({
-      id: "cluster-count", type: "symbol", source: "stores", filter: ["has", "point_count"],
-      layout: { "text-field": ["get", "point_count_abbreviated"], "text-size": 12, "text-font": ["Noto Sans Bold"] },
-      paint: { "text-color": "#fff" },
-    });
-    map.addLayer({
-      id: "points", type: "symbol", source: "stores", filter: ["!", ["has", "point_count"]],
+      id: "points", type: "symbol", source: "stores",
       layout: {
         "icon-image": ["concat", "pin-", ["to-string", ["get", "type"]]],
         "icon-anchor": "bottom",
@@ -320,21 +279,12 @@
     });
     applySelectedStyle();
 
-    map.on("click", "clusters", async (e) => {
-      const f = map.queryRenderedFeatures(e.point, { layers: ["clusters"] })[0];
-      if (!f) return;
-      const zoom = await map.getSource("stores").getClusterExpansionZoom(f.properties.cluster_id);
-      map.easeTo({ center: f.geometry.coordinates, zoom: Math.min(zoom + 0.5, CONFIG.maxZoom) });
-    });
     map.on("click", "points", (e) => {
       const f = e.features && e.features[0];
       if (f) select(f.properties.id, { fromMap: true, source: "carte" });
     });
-    for (const layer of ["clusters", "points"]) {
-      map.on("mouseenter", layer, () => (map.getCanvas().style.cursor = "pointer"));
-      map.on("mouseleave", layer, () => (map.getCanvas().style.cursor = ""));
-    }
-    map.on("moveend", refreshList);
+    map.on("mouseenter", "points", () => (map.getCanvas().style.cursor = "pointer"));
+    map.on("mouseleave", "points", () => (map.getCanvas().style.cursor = ""));
 
     state.mapReady = true;
   }
@@ -350,41 +300,61 @@
 
   function updateMapData() {
     if (!state.mapReady) return;
-    map.getSource("stores").setData(toGeoJSON(filteredStores()));
+    map.getSource("stores").setData(toGeoJSON(state.visible));
   }
 
-  // ---------- Liste ----------------------------------------------------------
-  function refreshList() {
-    if (!state.mapReady) return;
-    if (!state.filter[1] && !state.filter[2]) {
-      state.visible = []; renderList(true); setStatus(CONFIG.labels.noFilter); flushSearchFromList("aucun_resultat"); return;
-    }
-    const zoom = map.getZoom();
-    if (zoom < CONFIG.listMinZoom && !state.origin) {
-      state.visible = []; renderList(true);
-      setStatus(CONFIG.labels.hint(nf.format(state.stores.length)));
-      flushSearchFromList("aucun_resultat");
-      return;
-    }
-
-    const b = map.getBounds();
-    const originInView = state.origin && b.contains(state.origin);
-    const c = map.getCenter();
-    const ref = originInView ? state.origin : [c.lng, c.lat];
-
-    const inView = [];
+  // ---------- Résultats -------------------------------------------------------
+  // Les maxResults points de vente les plus proches de state.origin, dans un rayon de maxDistanceKm,
+  // pour les services cochés dans la légende.
+  function nearestStores() {
+    const [lng0, lat0] = state.origin, R = CONFIG.maxDistanceKm;
+    const dLat = R / 111, dLng = R / (111 * Math.max(0.1, Math.cos((lat0 * Math.PI) / 180)));
+    const out = [];
     for (const s of state.stores) {
       if (!state.filter[s.type]) continue;
-      if (s.lng < b.getWest() || s.lng > b.getEast() || s.lat < b.getSouth() || s.lat > b.getNorth()) continue;
-      s.dist = distanceKm(ref, [s.lng, s.lat]);
-      inView.push(s);
+      if (Math.abs(s.lat - lat0) > dLat || Math.abs(s.lng - lng0) > dLng) continue;   // préfiltre rapide
+      s.dist = distanceKm(state.origin, [s.lng, s.lat]);
+      if (s.dist <= R) out.push(s);
     }
-    inView.sort((a, b2) => a.dist - b2.dist);
-    state.visible = inView.slice(0, CONFIG.maxResults);
-    const n = state.visible.length, f = nf.format(n), more = inView.length > n;
-    setStatus(originInView ? CONFIG.labels.nearOrigin(n, f, more) : CONFIG.labels.inView(n, f, more));
+    out.sort((a, b) => a.dist - b.dist);
+    return out.slice(0, CONFIG.maxResults);
+  }
+
+  // Met à jour liste + carte. Retourne le nombre de points de vente affichés.
+  function showResults({ fit = true } = {}) {
+    if (!state.mapReady) return 0;
+    if (!state.origin) {
+      state.visible = [];
+      setStatus(CONFIG.labels.hint());
+    } else if (!state.filter[1] && !state.filter[2]) {
+      state.visible = [];
+      setStatus(CONFIG.labels.noFilter);
+    } else {
+      state.visible = nearestStores();
+      const n = state.visible.length;
+      setStatus(CONFIG.labels.nearOrigin(n, nf.format(n), CONFIG.maxDistanceKm, n >= CONFIG.maxResults));
+    }
+    updateMapData();
     renderList(true);
-    flushSearchFromList(n ? "succes" : "aucun_resultat");
+    if (fit && state.origin) fitToResults();
+    return state.visible.length;
+  }
+
+  // Cadre la carte sur la position recherchée et ses résultats.
+  function fitToResults() {
+    const pts = [state.origin, ...state.visible.map((s) => [s.lng, s.lat])];
+    if (pts.length === 1) {
+      map.flyTo({ center: state.origin, zoom: CONFIG.geolocZoom, speed: 1.6, essential: true });
+      return;
+    }
+    const bounds = pts.reduce((b, p) => b.extend(p), new maplibregl.LngLatBounds(pts[0], pts[0]));
+    const c = map.getContainer();
+    const pad = Math.round(Math.min(60, c.clientWidth * 0.1, c.clientHeight * 0.1));
+    const legendH = el.legend.offsetHeight || 0;
+    map.fitBounds(bounds, {
+      padding: { top: pad + 36, right: pad, bottom: Math.min(pad + legendH, c.clientHeight * 0.4), left: pad },
+      maxZoom: CONFIG.fitMaxZoom, speed: 1.6, essential: true,
+    });
   }
 
   function renderList(reset) {
@@ -513,14 +483,14 @@
     }
   }
 
-  function goToPlace(feature) {
-    const [lng, lat] = feature.geometry.coordinates;
-    const zoom = CONFIG.zoomByPlaceType[feature.properties.type] ?? CONFIG.zoomByPlaceType.default;
-    setOrigin([lng, lat]);
+  // Point de départ obtenu (adresse géocodée ou position) : affiche les résultats et émet la recherche.
+  function goToOrigin(lngLat) {
+    setOrigin(lngLat);
     state.selectedId = null; if (popup) popup.remove();
-    map.flyTo({ center: [lng, lat], zoom, speed: 1.6, essential: true });
-    armPendingSearch();   // refreshList et l'événement de recherche suivront au moveend
+    const n = showResults();
+    flushSearch(n ? "succes" : "aucun_resultat");
   }
+  const goToPlace = (feature) => goToOrigin(feature.geometry.coordinates);
 
   // Suggestions
   let debounceTimer, activeIndex = -1, suggestions = [], suggestSeq = 0;
@@ -594,7 +564,7 @@
 
   // ---------- Géolocalisation ------------------------------------------------
   el.geoloc.addEventListener("click", () => {
-    // Recherche déclarée au clic mais armée seulement quand la position est obtenue :
+    // Recherche déclarée au clic, émise seulement quand la position est obtenue (ou refusée) :
     // l'utilisateur peut laisser la fenêtre d'autorisation ouverte aussi longtemps qu'il veut.
     trackSearchStart("geolocalisation");
     if (!navigator.geolocation) { setStatus(CONFIG.labels.geolocError, true); flushSearch("erreur"); return; }
@@ -604,11 +574,8 @@
         el.geoloc.classList.remove("is-busy");
         const lngLat = [pos.coords.longitude, pos.coords.latitude];
         el.input.value = "";
-        setOrigin(lngLat);
-        state.selectedId = null; if (popup) popup.remove();
         if (!track.pending || track.pending.search_method !== "geolocalisation") trackSearchStart("geolocalisation");
-        map.flyTo({ center: lngLat, zoom: CONFIG.geolocZoom, speed: 1.6, essential: true });
-        armPendingSearch();
+        goToOrigin(lngLat);
       },
       (err) => {
         el.geoloc.classList.remove("is-busy");
@@ -634,8 +601,7 @@
     if (state.selectedId && !state.filter[state.byId.get(state.selectedId).type]) {
       state.selectedId = null; if (popup) popup.remove();
     }
-    updateMapData();
-    refreshList();
+    showResults();   // nouveaux résultats autour de la même position (pas d'événement de recherche)
   });
 
   // ---------- Onglets mobile -------------------------------------------------
@@ -655,8 +621,7 @@
     try {
       setStatus(CONFIG.labels.loading);
       await Promise.all([loadData(), initMap()]);
-      updateMapData();
-      refreshList();
+      showResults();   // rien sur la carte tant qu'aucune adresse ni position n'est donnée
       // Petite API publique (debug, ou pilotage depuis la page parente via postMessage si besoin).
       window.storeLocator = { map, search, select, state, CONFIG, lang: LANG };
       const q = new URLSearchParams(location.search).get("q");

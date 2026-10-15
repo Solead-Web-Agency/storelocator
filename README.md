@@ -9,8 +9,9 @@ en iframe dans Webflow.
   `I18N` de `assets/app.js`, les textes HTML dans chaque `index.html` (à garder synchronisés).
 - Carte : [MapLibre GL](https://maplibre.org/) avec le fond clair « positron » d'[OpenFreeMap](https://openfreemap.org/) (gratuit, sans clé).
 - Recherche : géocodeur adresses de l'État (Géoplateforme IGN, repli sur l'API Adresse BAN), gratuit et sans clé.
-- Regroupement automatique des 28 000 points en clusters. La liste ne montre que les 10 points de vente visibles
-  les plus proches de la recherche (ou du centre de la carte) ; la carte, elle, les affiche tous (`maxResults` dans `CONFIG`).
+- À l'ouverture, ni la carte ni la liste n'affichent de point de vente. Après une recherche (adresse, ville, code postal)
+  ou une géolocalisation, la carte et la liste montrent les 10 points de vente les plus proches dans un rayon de 50 km,
+  et la carte se cadre dessus (`maxResults` et `maxDistanceKm` dans `CONFIG`).
 
 ## Mettre à jour les données
 
@@ -72,7 +73,7 @@ L'app n'embarque ni GTM ni `dataLayer`. À chaque recherche et à chaque sélect
 
 - `search_method` : `code_postal` (saisie de 4 ou 5 chiffres), `ville` (autre saisie ou suggestion), `geolocalisation`.
 - `search_term` : le code postal tel quel, la ville normalisée (`saint_etienne`), ou la chaîne `geolocalisation`.
-- `search_status` : `succes` (≥ 1 point de vente listé), `aucun_resultat` (0 point de vente, ou adresse non reconnue),
+- `search_status` : `succes` (≥ 1 point de vente affiché), `aucun_resultat` (aucun point de vente à moins de 50 km, ou adresse non reconnue),
   `erreur` (géocodeur injoignable, géolocalisation refusée ou indisponible).
 - `store_name` : colonne `Nom` de l'export, normalisée (`pcs_store` tant que l'export ne contient pas de nom propre).
 - `store_city` : colonne `Ville` de l'export, sans numéro d'arrondissement, normalisée (`paris`, `lyon`).
