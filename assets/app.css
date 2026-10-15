@@ -14,6 +14,14 @@
   --sl-radius: 12px;
   --sl-font: "Archivo", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --sl-font-title: "Archivo Black", "Archivo", system-ui, sans-serif;
+  /* Bouton principal aligné sur la classe .button du site mypcs (Webflow) */
+  --sl-cta-font: "Figtree", Arial, sans-serif;
+  --sl-cta-gradient: linear-gradient(#da2f26, #e9495b 73%, #ea534d);
+  --sl-cta-radius: 8px;
+  --sl-field-h: 46px;
+  /* Bouton secondaire aligné sur .button.is-secondary du site (taille « small ») */
+  --sl-btn2-border: #d9d9d9;
+  --sl-btn2-color: #3e3e3e;
   --sl-gap: 16px;
 }
 
@@ -62,10 +70,10 @@ button { cursor: pointer; }
 
 .sl-input {
   width: 100%;
-  height: 40px;
-  padding: 0 40px 0 12px;
+  height: var(--sl-field-h);
+  padding: 0 44px 0 14px;
   border: 1px solid var(--sl-border);
-  border-radius: 6px;
+  border-radius: var(--sl-cta-radius);
   background: #fff;
   outline: none;
 }
@@ -74,7 +82,7 @@ button { cursor: pointer; }
 
 .sl-geoloc {
   position: absolute; top: 0; right: 0;
-  width: 40px; height: 40px;
+  width: 44px; height: var(--sl-field-h);
   display: grid; place-items: center;
   border: 0; background: transparent; color: var(--sl-muted);
   border-radius: 6px;
@@ -97,18 +105,23 @@ button { cursor: pointer; }
 /* ---------- Boutons ------------------------------------------------------- */
 .sl-btn {
   display: inline-flex; align-items: center; justify-content: center;
-  height: 36px; padding: 0 14px;
-  border: 1px solid var(--sl-border); border-radius: 6px;
-  background: #fff; color: var(--sl-ink);
-  font-size: 13px; font-weight: 500; text-decoration: none; white-space: nowrap;
-  transition: background 0.15s, border-color 0.15s;
+  height: 38px; padding: 0 1rem;
+  border: 1px solid var(--sl-btn2-border); border-radius: var(--sl-cta-radius);
+  background: #fff; color: var(--sl-btn2-color);
+  font-family: var(--sl-cta-font); font-size: 14px; font-weight: 700; line-height: 1.2;
+  text-decoration: none; white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
-.sl-btn:hover { border-color: var(--sl-ink); }
+.sl-btn:hover { border-color: var(--sl-btn2-color); color: var(--sl-ink); }
 .sl-btn--primary {
-  height: 40px; padding: 0 16px;
-  background: var(--sl-red); border-color: var(--sl-red); color: #fff; font-weight: 600;
+  height: var(--sl-field-h); padding: 0 16px;
+  border: 0; border-radius: var(--sl-cta-radius);
+  background-color: #000; background-image: var(--sl-cta-gradient); color: #fff;
+  font-family: var(--sl-cta-font); font-size: 16px; font-weight: 700; line-height: 1.2;
+  cursor: pointer;
 }
-.sl-btn--primary:hover { background: var(--sl-red-dark); border-color: var(--sl-red-dark); }
+.sl-btn--primary:hover { filter: brightness(0.94); }
+.sl-btn--primary:focus-visible { outline: 2px solid var(--sl-ink); outline-offset: 2px; }
 
 /* ---------- Onglets mobile (Liste / Carte) -------------------------------- */
 .sl-tabs { display: none; gap: 6px; padding: 4px; border-radius: 8px; background: #f0f0f0; margin-bottom: 10px; }
@@ -189,7 +202,7 @@ button { cursor: pointer; }
 .sl-pop p  { margin: 0; font-size: 12px; line-height: 1.45; }
 .sl-pop__services { color: var(--sl-muted); margin-top: 4px !important; }
 .sl-pop__actions { display: flex; gap: 8px; margin-top: 12px; }
-.sl-pop__actions .sl-btn { height: 32px; padding: 0 12px; font-size: 12.5px; }
+.sl-pop__actions .sl-btn { height: 34px; padding: 0 12px; font-size: 13px; }
 
 .maplibregl-ctrl-group { border-radius: 8px !important; box-shadow: 0 2px 8px rgba(0,0,0,0.12) !important; }
 .maplibregl-ctrl-attrib { font-size: 10px; }
